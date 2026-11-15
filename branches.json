@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "default_check_ports": [445, 1433],
+  "probe_timeout_seconds": 2.0,
+  "branches": [
+    {
+      "id": "wuse",
+      "name": "Wuse",
+      "label": "Wuse (SERVER 1)",
+      "server": "192.168.0.5"
+    },
+    {
+      "id": "asokoro",
+      "name": "Asokoro",
+      "label": "Asokoro (SERVER 2)",
+      "server": "192.168.2.16"
+    },
+    {
+      "id": "maitama",
+      "name": "Maitama",
+      "label": "Maitama (SERVER 3)",
+      "server": "192.168.0.7"
+    }
+  ]
+}

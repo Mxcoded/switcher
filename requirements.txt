@@ -1,0 +1,6 @@
+# BrickVPN Branch Selector has no runtime dependencies beyond the Python
+# standard library (tkinter is included with python.org builds).
+#
+# Building the Windows executable needs PyInstaller:
+#   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+pyinstaller>=6.3

@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+
+# PyInstaller output (regenerate with: pyinstaller BrickVPN.spec)
+build/
+dist/
+
+# Generated at runtime
+backups/
+logs/
+*.log
