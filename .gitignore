@@ -5,7 +5,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 
-# PyInstaller output (regenerate with: pyinstaller BrickVPN.spec)
+# PyInstaller output (regenerate with: pyinstaller Switcher.spec)
 build/
 dist/
 
@@ -13,3 +13,6 @@ dist/
 backups/
 logs/
 *.log
+
+# Vendor signing keys (never commit)
+keys/

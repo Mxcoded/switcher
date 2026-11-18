@@ -1,6 +1,9 @@
-# BrickVPN Branch Selector has no runtime dependencies beyond the Python
-# standard library (tkinter is included with python.org builds).
+# Switcher has no runtime dependencies beyond the Python standard library
+# (tkinter is included with python.org builds).
 #
-# Building the Windows executable needs PyInstaller:
+# Build-time tools only:
+#   PyInstaller packages Switcher.exe and SwitcherSetup.exe
+#   Pillow lets tools/make_assets.py rebuild the icon and header mark
 #   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 pyinstaller>=6.3
+pillow>=10.0

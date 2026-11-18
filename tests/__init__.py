@@ -1,1 +1,1 @@
-"""Unit tests for the BrickVPN branch selector."""
+"""Unit tests for Switcher."""

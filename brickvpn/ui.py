@@ -1,4 +1,4 @@
-"""Tkinter user interface for the BrickVPN branch selector."""
+"""Tkinter user interface for Switcher."""
 
 from __future__ import annotations
 
@@ -8,13 +8,15 @@ import platform
 import queue
 import threading
 import tkinter as tk
-from datetime import datetime
+from dataclasses import replace
+from datetime import date, datetime
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Any, Callable
 
-from . import __version__, paths, theme
+from . import __version__, licensing, paths, theme
 from .branch_editor import BranchEditorDialog
+from .branding import APP_NAME, BRAND_MARK, COMPANY, DEVELOPER
 from .branches import (
     DEFAULT_CHECK_PORTS,
     DEFAULT_PROBE_TIMEOUT,
@@ -59,17 +61,22 @@ class BranchSelectorApp:
         settings_path: Path | None,
         branches_path: Path,
         auto_shortcut: bool = True,
+        license_path: Path | None = None,
     ) -> None:
         self.root = root
         self.state = paths.load_state()
         self.settings_path = settings_path
         self.branches_path = branches_path
         self.auto_shortcut = auto_shortcut
+        self.license_path = license_path
+        self.license, self.license_file, license_error = licensing.discover(license_path)
+        self.license_status = self._evaluate_license(license_error)
 
         self.catalog: BranchCatalog | None = None
         self.catalog_error: str | None = None
         self.busy = False
         self._branches_mtime: float | None = None
+        self._logo_image: tk.PhotoImage | None = None
 
         self._tasks: "queue.Queue[tuple[Callable[[Any], None], Any]]" = queue.Queue()
 
@@ -89,7 +96,7 @@ class BranchSelectorApp:
     # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
-        self.root.title("BrickVPN Branch Selector")
+        self.root.title(APP_NAME)
         icon = asset_icon()
         if icon is not None:
             try:
@@ -98,19 +105,28 @@ class BranchSelectorApp:
                 _LOGGER.warning("Could not apply the window icon", exc_info=True)
 
         theme.install(self.root)
-        self.root.geometry("840x720")
-        self.root.minsize(740, 620)
+        self.root.geometry("860x780")
+        self.root.minsize(740, 660)
 
         self._build_menu()
         self._build_header()
         self._build_status_bar()
+        self._build_license_banner()
 
         main = ttk.Frame(self.root, padding=(22, 16, 22, 12))
+        self.main_frame = main
         main.pack(fill="both", expand=True)
         self._build_status_card(main)
-        self._build_branch_card(main)
         self._build_actions(main)
+        self._build_branch_card(main)
+        self._refresh_license_banner()
 
+        self.root.update_idletasks()
+        extra = self.license_banner.winfo_reqheight() if self._banner_visible else 0
+        target_height = min(
+            780 + extra, max(self.root.winfo_screenheight() - 80, 660)
+        )
+        self.root.geometry(f"860x{target_height}")
         self.root.update_idletasks()
         width = self.root.winfo_width()
         height = self.root.winfo_height()
@@ -122,8 +138,106 @@ class BranchSelectorApp:
         self.root.bind_all("<F5>", lambda _event: self.refresh_status())
         self.root.bind_all("<Control-t>", lambda _event: self.test_connection())
         self.root.bind_all("<Control-r>", lambda _event: self._reload_catalog())
-        self.root.bind_all("<Control-e>", lambda _event: self.edit_branches())
+        self.root.bind("<Control-e>", lambda _event: self.edit_branches())
         self.root.bind_all("<Control-d>", lambda _event: self.copy_diagnostics())
+        self.root.bind_all("<Control-l>", lambda _event: self.show_license())
+
+    def _evaluate_license(self, error: str | None) -> licensing.LicenseStatus:
+        """Judge the licence, resisting a backwards system clock."""
+        last_seen_raw = self.state.get("last_seen_date")
+        last_seen: date | None = None
+        if isinstance(last_seen_raw, str):
+            try:
+                last_seen = date.fromisoformat(last_seen_raw)
+            except ValueError:
+                last_seen = None
+
+        today, rollback = licensing.resolve_today(date.today(), last_seen)
+        self.state["last_seen_date"] = today.isoformat()
+        if rollback:
+            self.state["clock_rollback_at"] = datetime.now().isoformat(timespec="seconds")
+            _LOGGER.warning(
+                "System clock moved backwards; judging the licence by %s", today
+            )
+        paths.save_state(self.state)
+
+        if error is not None:
+            status = licensing.status_from_error(self.license_file, error)
+        else:
+            status = licensing.evaluate(self.license, today)
+
+        if rollback and status.level in {"ok", "info"}:
+            note = (
+                f"The system clock appears to have moved backwards, so the licence "
+                f"is checked against {today:%d %b %Y}. Please correct the date."
+            )
+            status = replace(
+                status,
+                level="warning",
+                message=f"{note} {status.message}".strip(),
+            )
+        return status
+
+    def _build_license_banner(self) -> None:
+        self.license_banner = tk.Frame(self.root)
+        self._banner_inner = tk.Frame(self.license_banner, padx=22, pady=8)
+        self._banner_inner.pack(fill="x")
+        self.license_banner_label = tk.Label(
+            self._banner_inner,
+            text="",
+            font=theme.FONT_SMALL,
+            anchor="w",
+            justify="left",
+            wraplength=680,
+        )
+        self.license_banner_label.pack(side="left", fill="x", expand=True)
+
+    def _refresh_license_banner(self) -> None:
+        """Show, recolour or hide the licence reminder strip."""
+        status = self.license_status
+        self._refresh_license_row()
+        self.license_banner.pack_forget()
+        self._banner_visible = False
+        if status.level == "ok" or not status.message:
+            return
+
+        background, foreground = {
+            "warning": theme.TONE_WARN,
+            "error": theme.TONE_ERROR,
+        }.get(status.level, theme.TONE_NEUTRAL)
+        self.license_banner.configure(bg=background)
+        self._banner_inner.configure(bg=background)
+        self.license_banner_label.configure(
+            bg=background, fg=foreground, text=status.message
+        )
+        self.license_banner.pack(fill="x", before=self.main_frame)
+        self._banner_visible = True
+
+    def _refresh_license_row(self) -> None:
+        """Keep the status card's renewal countdown in step with the licence."""
+        if not hasattr(self, "license_label"):
+            return
+        level = self.license_status.level
+        colour = {
+            "ok": theme.OK,
+            "info": theme.INK,
+            "warning": theme.WARN,
+            "error": theme.ERROR,
+        }.get(level, theme.INK)
+        self._set_label(
+            self.license_label, licensing.countdown_text(self.license_status), colour
+        )
+
+    def _load_logo(self) -> tk.PhotoImage | None:
+        """Load the header mark from the bundled assets folder."""
+        path = paths.asset_dir() / "logo_mark.png"
+        if not path.is_file():
+            return None
+        try:
+            return tk.PhotoImage(file=str(path))
+        except tk.TclError:
+            _LOGGER.warning("Could not load the header logo from %s", path, exc_info=True)
+            return None
 
     def _build_header(self) -> None:
         header = tk.Frame(self.root, bg=theme.NAVY)
@@ -133,15 +247,25 @@ class BranchSelectorApp:
 
         left = tk.Frame(inner, bg=theme.NAVY)
         left.pack(side="left", anchor="w")
+        brand = tk.Frame(left, bg=theme.NAVY)
+        brand.pack(anchor="w")
+        logo = self._load_logo()
+        if logo is not None:
+            self._logo_image = logo
+            tk.Label(brand, image=logo, bg=theme.NAVY).pack(
+                side="left", padx=(0, 14)
+            )
+        headings = tk.Frame(brand, bg=theme.NAVY)
+        headings.pack(side="left", anchor="w")
         tk.Label(
-            left,
-            text="Branch Selector",
+            headings,
+            text=APP_NAME,
             bg=theme.NAVY,
             fg="#ffffff",
             font=theme.FONT_TITLE,
         ).pack(anchor="w")
         tk.Label(
-            left,
+            headings,
             text="Point this workstation at another branch's server. Sign in to Twingate first.",
             bg=theme.NAVY,
             fg="#b9c6dd",
@@ -152,7 +276,7 @@ class BranchSelectorApp:
         badge.pack(side="right", anchor="e")
         tk.Label(
             badge,
-            text="BRICKVPN",
+            text=BRAND_MARK,
             bg=theme.NAVY_SOFT,
             fg="#e2ebff",
             font=theme.FONT_SECTION,
@@ -166,6 +290,13 @@ class BranchSelectorApp:
             fg="#8fa3c4",
             font=theme.FONT_SMALL,
         ).pack(anchor="e", pady=(4, 0))
+        tk.Label(
+            badge,
+            text=f"by {DEVELOPER}",
+            bg=theme.NAVY,
+            fg="#8fa3c4",
+            font=theme.FONT_SMALL,
+        ).pack(anchor="e", pady=(1, 0))
 
         tk.Frame(self.root, bg=theme.ACCENT, height=3).pack(fill="x")
 
@@ -236,6 +367,9 @@ class BranchSelectorApp:
 
         help_menu = tk.Menu(menubar, tearoff=False)
         help_menu.add_command(
+            label="Licence...", command=self.show_license, accelerator="Ctrl+L"
+        )
+        help_menu.add_command(
             label="Copy diagnostics", command=self.copy_diagnostics, accelerator="Ctrl+D"
         )
         help_menu.add_command(label="About", command=self.show_about)
@@ -259,8 +393,17 @@ class BranchSelectorApp:
         ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
 
         self.current_label = self._status_row(inner, 1, "Current server")
-        self.twingate_label = self._status_row(inner, 2, "Twingate")
-        self.connection_label = self._status_row(inner, 3, "Connection")
+        self.twingate_label = self._status_row(
+            inner, 2, "Twingate", style="SecondaryValue.TLabel"
+        )
+        self.connection_label = self._status_row(
+            inner, 3, "Connection", style="SecondaryValue.TLabel"
+        )
+        self.license_label = self._status_row(
+            inner, 4, "Licence", style="SecondaryValue.TLabel"
+        )
+        self.license_label.configure(cursor="hand2")
+        self.license_label.bind("<Button-1>", lambda _event: self.show_license())
 
         tk.Label(
             inner,
@@ -268,7 +411,7 @@ class BranchSelectorApp:
             bg=theme.CARD,
             fg=theme.MUTED,
             font=theme.FONT_SMALL,
-        ).grid(row=4, column=0, sticky="w", pady=(9, 0), padx=(0, 14))
+        ).grid(row=5, column=0, sticky="w", pady=(9, 0), padx=(0, 14))
         self.settings_label = tk.Label(
             inner,
             text="Not located",
@@ -277,11 +420,12 @@ class BranchSelectorApp:
             font=theme.FONT_SMALL,
             anchor="w",
             justify="left",
+            wraplength=430,
         )
-        self.settings_label.grid(row=4, column=1, sticky="w", pady=(9, 0))
+        self.settings_label.grid(row=5, column=1, sticky="w", pady=(9, 0))
 
         actions = tk.Frame(inner, bg=theme.CARD)
-        actions.grid(row=4, column=2, sticky="e", pady=(9, 0))
+        actions.grid(row=5, column=2, sticky="e", pady=(9, 0))
         ttk.Button(
             actions, text="Open", style="Link.TButton", command=self.open_settings
         ).pack(side="left")
@@ -289,7 +433,16 @@ class BranchSelectorApp:
             actions, text="Change...", style="Link.TButton", command=self.locate_settings
         ).pack(side="left", padx=(4, 0))
 
-    def _status_row(self, parent: tk.Frame, row: int, title: str) -> ttk.Label:
+        self._set_label(self.connection_label, "Not tested", theme.MUTED)
+
+    def _status_row(
+        self,
+        parent: tk.Frame,
+        row: int,
+        title: str,
+        *,
+        style: str = "Value.TLabel",
+    ) -> ttk.Label:
         tk.Label(
             parent,
             text=title,
@@ -298,7 +451,7 @@ class BranchSelectorApp:
             font=theme.FONT_SMALL,
         ).grid(row=row, column=0, sticky="nw", padx=(0, 14), pady=3)
         value = ttk.Label(
-            parent, text="-", style="Value.TLabel", wraplength=520, justify="left"
+            parent, text="-", style=style, wraplength=520, justify="left"
         )
         value.grid(row=row, column=1, columnspan=2, sticky="w", pady=3)
         return value
@@ -308,9 +461,11 @@ class BranchSelectorApp:
         card.pack(fill="both", expand=True, pady=(16, 0))
         inner = tk.Frame(card, bg=theme.CARD, padx=18, pady=14)
         inner.pack(fill="both", expand=True)
+        inner.columnconfigure(0, weight=1)
+        inner.rowconfigure(2, weight=1)
 
         head = tk.Frame(inner, bg=theme.CARD)
-        head.pack(fill="x")
+        head.grid(row=0, column=0, sticky="ew")
         tk.Label(
             head,
             text="BRANCHES",
@@ -335,14 +490,14 @@ class BranchSelectorApp:
             justify="left",
             wraplength=700,
         )
-        self.catalog_message.pack(anchor="w", pady=(4, 0))
+        self.catalog_message.grid(row=1, column=0, sticky="w", pady=(4, 0))
 
         table = tk.Frame(inner, bg=theme.CARD)
-        table.pack(fill="both", expand=True, pady=(8, 0))
+        table.grid(row=2, column=0, sticky="nsew", pady=(8, 0))
 
         columns = ("branch", "server", "status")
         self.tree = ttk.Treeview(
-            table, columns=columns, show="headings", selectmode="browse", height=7
+            table, columns=columns, show="headings", selectmode="browse", height=6
         )
         self.tree.heading("branch", text="Branch")
         self.tree.heading("server", text="Server")
@@ -353,6 +508,7 @@ class BranchSelectorApp:
         self.tree.tag_configure(
             "current", font=theme.FONT_BOLD, foreground=theme.OK
         )
+        self.tree.tag_configure("odd", background="#f7f9fc")
 
         scroll = ttk.Scrollbar(table, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scroll.set)
@@ -371,11 +527,11 @@ class BranchSelectorApp:
             anchor="w",
             justify="left",
             wraplength=700,
-        ).pack(anchor="w", pady=(10, 0))
+        ).grid(row=3, column=0, sticky="w", pady=(10, 0))
 
     def _build_actions(self, parent: ttk.Frame) -> None:
         bar = ttk.Frame(parent)
-        bar.pack(fill="x", pady=(16, 0))
+        bar.pack(fill="x", side="bottom", pady=(14, 0))
 
         self.check_btn = ttk.Button(
             bar, text="Test connection", command=self.test_connection
@@ -441,12 +597,13 @@ class BranchSelectorApp:
             return
 
         self.catalog_message.configure(text="")
-        for branch in self.catalog.branches:
+        for index, branch in enumerate(self.catalog.branches):
             self.tree.insert(
                 "",
                 "end",
                 iid=branch.id,
                 values=(branch.display_name, branch.server, ""),
+                tags=("odd",) if index % 2 else (),
             )
         if select_id and self.tree.exists(select_id):
             self.tree.selection_set(select_id)
@@ -536,13 +693,13 @@ class BranchSelectorApp:
     def _refresh_current(self) -> None:
         if not self.settings_path:
             self._set_label(self.current_label, "settings.ini not found", COLOR_ERROR)
-            self.settings_label.configure(text=f"Expected at {_shorten(str(paths.default_settings_path()))}")
+            self.settings_label.configure(text=f"Expected at {_shorten(str(paths.preferred_settings_path()))}")
             self._set_label(self.connection_label, "Not checked", COLOR_MUTED)
             self._mark_current()
             self._update_actions()
             return
 
-        self.settings_label.configure(text=_shorten(str(self.settings_path)))
+        self.settings_label.configure(text=_shorten(str(self.settings_path), 48))
         try:
             server = SettingsDocument.read(self.settings_path).current_server()
         except (OSError, SettingsError) as exc:
@@ -569,11 +726,14 @@ class BranchSelectorApp:
         if self.catalog is None:
             return
         current = self._read_current_server()
-        for branch in self.catalog.branches:
+        for index, branch in enumerate(self.catalog.branches):
             is_current = bool(
                 current and branch.server.lower() == current.strip().lower()
             )
-            tags: tuple[str, ...] = ("current",) if is_current else ()
+            if is_current:
+                tags: tuple[str, ...] = ("current",)
+            else:
+                tags = ("odd",) if index % 2 else ()
             try:
                 self.tree.item(
                     branch.id,
@@ -604,6 +764,13 @@ class BranchSelectorApp:
 
     def switch_branch(self) -> None:
         if self.busy:
+            return
+        if not self.license_status.can_switch:
+            self.status_var.set("Switching is disabled until the licence is renewed.")
+            messagebox.showerror(
+                "Licence required",
+                f"{self.license_status.message}\n\nSee Help > Licence for details.",
+            )
             return
         branch = self._selected_branch()
         if branch is None:
@@ -677,7 +844,7 @@ class BranchSelectorApp:
             if isinstance(result, SettingsAccessError):
                 if messagebox.askyesno(
                     "Could not switch branch",
-                    f"{detail}\n\nRestart BrickVPN Branch Selector as administrator now?",
+                    f"{detail}\n\nRestart {APP_NAME} as administrator now?",
                 ):
                     self.restart_as_admin()
                 return
@@ -790,6 +957,7 @@ class BranchSelectorApp:
     def edit_branches(self) -> None:
         """Open the in-app editor for the branch catalogue."""
         if self.busy:
+            self.status_var.set("Wait for the current operation to finish, then edit branches.")
             return
         if not self.branches_path.exists():
             self._load_catalog(initial=True)
@@ -847,10 +1015,10 @@ class BranchSelectorApp:
     def _prompt_for_settings(self) -> None:
         if self.settings_path is not None:
             return
-        expected = paths.default_settings_path()
+        expected = paths.preferred_settings_path()
         if messagebox.askyesno(
             "settings.ini not found",
-            "settings.ini was not found next to the app or in the current folder.\n\n"
+            f"settings.ini was not found in {paths.DEPLOYMENT_DIR} or next to the app.\n\n"
             f"Expected: {expected}\n\n"
             "Locate the hotel software's settings.ini now?",
         ):
@@ -859,7 +1027,7 @@ class BranchSelectorApp:
     def locate_settings(self) -> None:
         initial = (            str(self.settings_path.parent)
             if self.settings_path
-            else str(paths.default_settings_path().parent)
+            else str(paths.preferred_settings_path().parent)
         )
         selected = filedialog.askopenfilename(
             title="Locate the hotel software's settings.ini",
@@ -926,7 +1094,11 @@ class BranchSelectorApp:
         messagebox.showinfo("Desktop shortcut", f"Shortcut created:\n{result}")
 
     def _auto_shortcut(self) -> None:
-        if not paths.is_frozen() and os.environ.get("BRICKVPN_FORCE_SHORTCUT") != "1":
+        force = (
+            os.environ.get("SWITCHER_FORCE_SHORTCUT")
+            or os.environ.get("BRICKVPN_FORCE_SHORTCUT")
+        ) == "1"
+        if not paths.is_frozen() and not force:
             return
         stored = self.state.get("shortcut_path")
         stored_exe = self.state.get("shortcut_exe")
@@ -951,7 +1123,7 @@ class BranchSelectorApp:
     def copy_diagnostics(self) -> None:
         """Copy a support-friendly snapshot to the clipboard."""
         lines = [
-            f"BrickVPN Branch Selector {__version__}",
+            f"{APP_NAME} {__version__} (developed by {DEVELOPER} for {COMPANY})",
             f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             f"Windows: {platform.platform()}",
             f"Application folder: {paths.app_dir()}",
@@ -960,7 +1132,12 @@ class BranchSelectorApp:
             f"Current server: {self._read_current_server() or 'not set'}",
             f"Twingate: {self.twingate_label.cget('text')}",
             f"Connection: {self.connection_label.cget('text')}",
+            f"Licence: {licensing.countdown_text(self.license_status)}",
+            f"Licence state: {self.license_status.state}",
+            f"Licence file: {self.license_file or 'not found'}",
         ]
+        if self.license_status.message:
+            lines.append(f"Licence note: {self.license_status.message}")
         if self.catalog is not None:
             lines.append(f"Branches loaded: {len(self.catalog.branches)}")
         if self.catalog_error:
@@ -975,15 +1152,33 @@ class BranchSelectorApp:
             return
         self.status_var.set("Diagnostics copied to the clipboard.")
 
+    def show_license(self) -> None:
+        """Show the licence terms and the renewal state."""
+        status = self.license_status
+        if status.license is None:
+            body = status.message
+        else:
+            summary = licensing.describe(status.license)
+            detail = status.message or "The licence is valid."
+            body = (
+                f"{licensing.countdown_text(status)}\n\n{summary}\n\n{detail}"
+            )
+        body = f"{body}\n\nFile: {self.license_file or 'not found'}"
+        messagebox.showinfo(f"{APP_NAME} licence", body)
+
     def show_about(self) -> None:
         messagebox.showinfo(
-            "About BrickVPN Branch Selector",
-            "BrickVPN Branch Selector {version}\n\n"
+            f"About {APP_NAME}",
+            "{app} {version}\n"
+            "{company} - developed by {developer}\n\n"
             "Branches: {branches}\n"
             "Settings file: {settings}\n"
             "Log folder: {logs}\n\n"
             "Twingate must be signed in before a branch server becomes reachable.".format(
+                app=APP_NAME,
                 version=__version__,
+                company=COMPANY,
+                developer=DEVELOPER,
                 branches=self.branches_path,
                 settings=self.settings_path or "not located",
                 logs=paths.log_dir(),
@@ -1002,7 +1197,7 @@ class BranchSelectorApp:
                 result = exc
             self._tasks.put((callback, result))
 
-        threading.Thread(target=runner, name="brickvpn-task", daemon=True).start()
+        threading.Thread(target=runner, name="switcher-task", daemon=True).start()
 
     def _post_progress(self, fraction: float, message: str) -> None:
         """Queue a progress update from a worker thread (safe to call anywhere)."""
@@ -1062,7 +1257,12 @@ class BranchSelectorApp:
 
     def _update_actions(self) -> None:
         has_catalog = bool(self.catalog and self.catalog.branches)
-        can_switch = has_catalog and self.settings_path is not None and not self.busy
+        can_switch = (
+            has_catalog
+            and self.settings_path is not None
+            and not self.busy
+            and self.license_status.can_switch
+        )
         can_check = (has_catalog or self.settings_path is not None) and not self.busy
 
         self.switch_btn.configure(state="normal" if can_switch else "disabled")

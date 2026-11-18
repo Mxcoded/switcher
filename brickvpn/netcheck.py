@@ -85,7 +85,7 @@ def probe(
             ticker = threading.Thread(
                 target=_heartbeat,
                 args=(on_progress, host, port, timeout, started, stop, base, span),
-                name="brickvpn-probe",
+                name="switcher-probe",
                 daemon=True,
             )
             ticker.start()

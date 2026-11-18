@@ -1,0 +1,18 @@
+{
+  "format": "switcher-licence/1",
+  "payload": {
+    "customer": "Brickspoint Technologies",
+    "expires": "2027-05-16",
+    "features": [
+      "branch-switching"
+    ],
+    "format": 1,
+    "grace_days": 14,
+    "issued": "2026-11-16",
+    "license_id": "AFR-2026-001",
+    "product": "Switcher",
+    "seats": 50,
+    "site": "All sites"
+  },
+  "signature": "Y6WStuCEx+pPUDPrYZ77zG19g2eNPwG7ZXpHLuxgfK/UlT36EaI1JZy+hfUise244eVBDcl1yjfHfkRaESbvu2mnTxdAgEhC8nMVkn2SKEJfgCL+P3+4VCFduvrJaVlv5hfXxd1wFKhGzYTDcvpiFRundg41h7BvSgBt7m3DPehscdGfDItb1LQZaGA4/FDXjJ0kBt7HyMEsp2itTqWtSIL2g7bLYE398zWaH0d4dhlM+w0i7R3Np6PQJBp26KuUuG29f8WY5buWiP/p9EIGnLAGXPFn27Ld/NCYq1AaqW3RtDj2b328J1FORggjCjP77V0P48rRq5M3LcGrJvhX5g=="
+}

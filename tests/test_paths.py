@@ -12,6 +12,14 @@ from brickvpn import paths
 
 
 class StateTests(unittest.TestCase):
+    def test_state_folder_is_namespaced_by_vendor(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            with mock.patch.dict(os.environ, {"LOCALAPPDATA": folder}):
+                self.assertEqual(
+                    paths.state_dir(), Path(folder) / "Afriwave" / "Switcher"
+                )
+                self.assertEqual(paths.log_dir(), paths.state_dir() / "logs")
+
     def test_state_round_trip_in_local_app_data(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
             with mock.patch.dict(os.environ, {"LOCALAPPDATA": folder}):
@@ -36,9 +44,13 @@ class SettingsResolutionTests(unittest.TestCase):
         self.folder = Path(handle.name)
         self.app_folder = self.folder / "app"
         self.app_folder.mkdir()
+        self.deployment = self.folder / "hotel"
         patcher = mock.patch.object(paths, "app_dir", return_value=self.app_folder)
         patcher.start()
         self.addCleanup(patcher.stop)
+        deployment_patcher = mock.patch.object(paths, "DEPLOYMENT_DIR", self.deployment)
+        deployment_patcher.start()
+        self.addCleanup(deployment_patcher.stop)
 
     def test_explicit_path_wins(self) -> None:
         cli_file = self.folder / "custom" / "settings.ini"
@@ -48,6 +60,22 @@ class SettingsResolutionTests(unittest.TestCase):
 
         resolved = paths.resolve_settings_path(str(cli_file), {})
         self.assertEqual(resolved, cli_file.resolve())
+
+    def test_deployment_folder_wins_over_the_app_folder(self) -> None:
+        deployment_file = self.deployment / "settings.ini"
+        deployment_file.parent.mkdir()
+        deployment_file.write_text("[Connection_Info]\n", encoding="utf-8")
+        (self.app_folder / "settings.ini").write_text("[Connection_Info]\n", encoding="utf-8")
+        stored = self.folder / "stored.ini"
+        stored.write_text("[Connection_Info]\n", encoding="utf-8")
+
+        resolved = paths.resolve_settings_path(None, {"settings_path": str(stored)})
+        self.assertEqual(resolved, deployment_file.resolve())
+
+    def test_deployment_settings_path_is_c_hotel(self) -> None:
+        self.assertEqual(
+            paths.deployment_settings_path(), self.deployment / "settings.ini"
+        )
 
     def test_state_path_is_used_when_no_cli_value(self) -> None:
         stored = self.folder / "stored.ini"
@@ -73,6 +101,22 @@ class SettingsResolutionTests(unittest.TestCase):
     def test_missing_settings_returns_none(self) -> None:
         with mock.patch.object(paths.Path, "cwd", return_value=self.folder / "elsewhere"):
             self.assertIsNone(paths.resolve_settings_path(None, {}))
+
+
+class AssetTests(unittest.TestCase):
+    def test_source_runs_use_the_project_assets_folder(self) -> None:
+        with mock.patch.object(paths, "app_dir", return_value=Path("C:/project")):
+            with mock.patch.object(paths.sys, "_MEIPASS", None, create=True):
+                self.assertEqual(
+                    paths.asset_dir(), Path("C:/project/assets")
+                )
+
+    def test_frozen_runs_prefer_the_bundled_assets(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            bundled = Path(folder) / "assets"
+            bundled.mkdir()
+            with mock.patch.object(paths.sys, "_MEIPASS", folder, create=True):
+                self.assertEqual(paths.asset_dir(), bundled)
 
 
 if __name__ == "__main__":

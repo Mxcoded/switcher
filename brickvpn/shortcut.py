@@ -13,11 +13,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .paths import app_dir, is_frozen
+from .branding import APP_NAME
+from .paths import app_dir, asset_dir, is_frozen
 
 _LOGGER = logging.getLogger(__name__)
 
-SHORTCUT_NAME = "BrickVPN Branch Selector"
+SHORTCUT_NAME = APP_NAME
 _CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
@@ -60,8 +61,15 @@ def launch_command() -> tuple[Path, str, Path]:
 
 
 def asset_icon() -> Path | None:
-    icon = app_dir() / "assets" / "brickvpn.ico"
+    icon = asset_dir() / "switcher.ico"
     return icon if icon.is_file() else None
+
+
+def start_menu_dir() -> Path:
+    """All-users Start Menu folder that holds the application shortcut."""
+    program_data = os.environ.get("PROGRAMDATA")
+    base = Path(program_data) if program_data else Path("C:/ProgramData")
+    return base / "Microsoft" / "Windows" / "Start Menu" / "Programs"
 
 
 def is_admin() -> bool:
@@ -107,6 +115,37 @@ def _elevation_request(
     return executable, " ".join(parts), workdir
 
 
+def create_shortcut(
+    link: Path,
+    executable: Path,
+    *,
+    arguments: str = "",
+    workdir: Path | None = None,
+    icon: Path | None = None,
+    description: str | None = None,
+) -> Path:
+    """Create or replace a ``.lnk`` that runs *executable*."""
+    if sys.platform != "win32":
+        raise ShortcutError("Desktop shortcuts are only supported on Windows.")
+
+    link = Path(link)
+    target = Path(executable)
+    script = _build_script(
+        link,
+        target,
+        arguments,
+        Path(workdir) if workdir is not None else target.parent,
+        icon or target,
+        description or link.stem,
+    )
+    link.parent.mkdir(parents=True, exist_ok=True)
+    _run_powershell(script)
+    if not link.exists():
+        raise ShortcutError(f"PowerShell did not create {link}.")
+    _LOGGER.info("Shortcut ready at %s", link)
+    return link
+
+
 def ensure_desktop_shortcut(*, force: bool = False, name: str = SHORTCUT_NAME) -> Path:
     """Create the shortcut if it is missing, or always when ``force`` is set."""
     if sys.platform != "win32":
@@ -117,14 +156,14 @@ def ensure_desktop_shortcut(*, force: bool = False, name: str = SHORTCUT_NAME) -
         return target
 
     executable, arguments, workdir = launch_command()
-    icon = asset_icon() or executable
-    script = _build_script(target, executable, arguments, workdir, icon, name)
-    _run_powershell(script)
-
-    if not target.exists():
-        raise ShortcutError(f"PowerShell did not create {target}.")
-    _LOGGER.info("Desktop shortcut ready at %s", target)
-    return target
+    return create_shortcut(
+        target,
+        executable,
+        arguments=arguments,
+        workdir=workdir,
+        icon=asset_icon() or executable,
+        description=name,
+    )
 
 
 def _quote(value: str | Path) -> str:

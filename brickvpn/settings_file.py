@@ -20,6 +20,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from .branding import APP_NAME
+
 _LOGGER = logging.getLogger(__name__)
 
 SECTION = "Connection_Info"
@@ -192,7 +194,7 @@ class SettingsDocument:
             _LOGGER.error("Access denied while writing %s", self.path)
             raise SettingsAccessError(
                 f"Windows refused write access to {self.path}.\n\n"
-                "Run BrickVPN Branch Selector as administrator (right-click the app, "
+                f"Run {APP_NAME} as administrator (right-click the app, "
                 'then choose "Run as administrator"), or ask IT to grant your account '
                 f"write access to {self.path.parent}."
             ) from exc

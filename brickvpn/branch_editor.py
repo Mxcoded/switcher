@@ -120,8 +120,8 @@ class BranchEditorDialog(tk.Toplevel):
 
         self.title("Edit branches")
         self.configure(bg=theme.BG)
-        self.minsize(860, 700)
-        self.geometry("900x720")
+        self.minsize(880, 700)
+        self.geometry("940x740")
         self.transient(parent)
         self.resizable(True, True)
 
@@ -166,14 +166,14 @@ class BranchEditorDialog(tk.Toplevel):
         tk.Frame(self, bg=theme.ACCENT, height=3).pack(fill="x")
 
         body = ttk.Frame(self, padding=(20, 16, 20, 10))
-        body.pack(fill="both", expand=True)
-        body.columnconfigure(0, weight=0, minsize=270)
+        body.columnconfigure(0, weight=0, minsize=300)
         body.columnconfigure(1, weight=1)
         body.rowconfigure(0, weight=1)
 
+        self._build_footer()
+        body.pack(fill="both", expand=True)
         self._build_list(body)
         self._build_form(body)
-        self._build_footer()
 
     def _build_list(self, parent: ttk.Frame) -> None:
         card = theme.card(parent)
@@ -191,7 +191,16 @@ class BranchEditorDialog(tk.Toplevel):
 
         table = tk.Frame(inner, bg=theme.CARD)
         table.pack(fill="both", expand=True)
-        self.list = ttk.Treeview(table, show="tree", selectmode="browse")
+        self.list = ttk.Treeview(
+            table,
+            columns=("branch", "server"),
+            show="headings",
+            selectmode="browse",
+        )
+        self.list.heading("branch", text="Branch")
+        self.list.heading("server", text="Server")
+        self.list.column("branch", width=165, anchor="w", stretch=True)
+        self.list.column("server", width=105, anchor="w", stretch=False)
         self.list.tag_configure("disabled", foreground=theme.MUTED)
         scroll = ttk.Scrollbar(table, orient="vertical", command=self.list.yview)
         self.list.configure(yscrollcommand=scroll.set)
@@ -278,10 +287,19 @@ class BranchEditorDialog(tk.Toplevel):
         self.notes_text.grid(row=11, column=0, columnspan=2, sticky="ew", pady=(3, 8))
 
         self.enabled_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
+        tk.Checkbutton(
             form,
             text="Offer this branch in the selector",
             variable=self.enabled_var,
+            bg=theme.CARD,
+            activebackground=theme.CARD,
+            fg=theme.INK,
+            activeforeground=theme.INK,
+            selectcolor="#ffffff",
+            font=theme.FONT,
+            highlightthickness=0,
+            bd=0,
+            anchor="w",
         ).grid(row=12, column=0, columnspan=2, sticky="w", pady=(2, 10))
 
         tk.Frame(form, bg=theme.BORDER, height=1).grid(
@@ -294,7 +312,7 @@ class BranchEditorDialog(tk.Toplevel):
         self._field(
             form,
             15,
-            "Default check ports",
+            "Default check ports (comma separated)",
             "default_ports",
             column=0,
             variable=self.default_ports_var,
@@ -303,20 +321,12 @@ class BranchEditorDialog(tk.Toplevel):
         self._field(
             form,
             15,
-            "Probe timeout (seconds)",
+            "Probe timeout (seconds, 0.5 to 30)",
             "probe_timeout",
             column=1,
             variable=self.timeout_var,
             span=1,
         )
-        tk.Label(
-            form,
-            text="Applies to branches without their own ports. Timeout range is 0.5 to 30 seconds.",
-            bg=theme.CARD,
-            fg=theme.MUTED,
-            font=theme.FONT_SMALL,
-            anchor="w",
-        ).grid(row=17, column=0, columnspan=2, sticky="w", pady=(2, 0))
 
     def _section(self, parent: tk.Frame, row: int, text: str, span: int = 1) -> None:
         tk.Label(
@@ -366,7 +376,7 @@ class BranchEditorDialog(tk.Toplevel):
 
     def _build_footer(self) -> None:
         footer = ttk.Frame(self, padding=(20, 0, 20, 16))
-        footer.pack(fill="x")
+        footer.pack(fill="x", side="bottom")
         self.error_label = tk.Label(
             footer,
             text="",
@@ -423,9 +433,14 @@ class BranchEditorDialog(tk.Toplevel):
         for item in self.list.get_children():
             self.list.delete(item)
         for branch in self.branches:
-            text = f"{branch.display_name}   -   {branch.server.strip() or 'no server yet'}"
             tags: tuple[str, ...] = () if branch.enabled else ("disabled",)
-            self.list.insert("", "end", iid=branch.id, text=text, tags=tags)
+            self.list.insert(
+                "",
+                "end",
+                iid=branch.id,
+                values=(branch.display_name, branch.server.strip() or "-"),
+                tags=tags,
+            )
         if self._current is not None and self.list.exists(self._current.id):
             self.list.selection_set(self._current.id)
             self.list.see(self._current.id)
@@ -466,9 +481,12 @@ class BranchEditorDialog(tk.Toplevel):
         """Update one row without touching the current selection."""
         if not self.list.exists(branch.id):
             return
-        text = f"{branch.display_name}   -   {branch.server.strip() or 'no server yet'}"
         tags: tuple[str, ...] = () if branch.enabled else ("disabled",)
-        self.list.item(branch.id, text=text, tags=tags)
+        self.list.item(
+            branch.id,
+            values=(branch.display_name, branch.server.strip() or "-"),
+            tags=tags,
+        )
 
     def _commit(self) -> EditorBranch | None:
         if self._current is None:
@@ -500,6 +518,7 @@ class BranchEditorDialog(tk.Toplevel):
             id=slugify(current.name or "branch", used),
             name=(current.name.strip() or "Branch") + " copy",
             label="",
+            alias="",
         )
         index = self.branches.index(current) + 1
         self.branches.insert(index, copy)

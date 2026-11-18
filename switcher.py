@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""BrickVPN Branch Selector - application entry point."""
+"""Switcher - application entry point."""
 
 from __future__ import annotations
 
@@ -14,9 +14,17 @@ from pathlib import Path
 from tkinter import messagebox
 
 from brickvpn import __version__, paths
+from brickvpn.branding import APP_NAME
 from brickvpn.ui import BranchSelectorApp
 
-LOGGER = logging.getLogger("brickvpn")
+LOGGER = logging.getLogger("switcher")
+
+
+def _env_flag(name: str, legacy: str | None = None) -> bool:
+    """Read a boolean environment flag, accepting a legacy name."""
+    if os.environ.get(name) == "1":
+        return True
+    return bool(legacy and os.environ.get(legacy) == "1")
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -37,7 +45,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Do not create the desktop shortcut automatically.",
     )
-    parser.add_argument("--version", action="version", version=f"BrickVPN Branch Selector {__version__}")
+    parser.add_argument(
+        "--license",
+        help="Path to license.json (default: the file next to the application).",
+    )
+    parser.add_argument("--version", action="version", version=f"{APP_NAME} {__version__}")
     return parser.parse_args(argv)
 
 
@@ -95,7 +107,7 @@ def install_excepthook() -> None:
         LOGGER.critical("Unhandled error", exc_info=(exc_type, exc, traceback))
         try:
             messagebox.showerror(
-                "BrickVPN Branch Selector",
+                APP_NAME,
                 f"An unexpected error occurred:\n\n{exc}\n\nSee the log for details.",
             )
         except tk.TclError:
@@ -129,7 +141,8 @@ def main(argv: list[str] | None = None) -> int:
 
     apply_tk_scaling(root)
     LOGGER.info(
-        "Starting BrickVPN Branch Selector %s (settings=%s, branches=%s)",
+        "Starting %s %s (settings=%s, branches=%s)",
+        APP_NAME,
         __version__,
         settings_path or "not found",
         branches_path,
@@ -139,7 +152,11 @@ def main(argv: list[str] | None = None) -> int:
         root,
         settings_path=settings_path,
         branches_path=branches_path,
-        auto_shortcut=not args.no_shortcut and os.environ.get("BRICKVPN_NO_SHORTCUT") != "1",
+        auto_shortcut=not args.no_shortcut
+        and not _env_flag("SWITCHER_NO_SHORTCUT", "BRICKVPN_NO_SHORTCUT"),
+        license_path=(
+            Path(args.license).expanduser().resolve() if args.license else None
+        ),
     )
     root.mainloop()
     return 0

@@ -1,4 +1,4 @@
-"""Colours, fonts and ttk styles shared by the BrickVPN windows."""
+"""Colours, fonts and ttk styles shared by the Switcher windows."""
 
 from __future__ import annotations
 
@@ -48,6 +48,9 @@ def install(root: tk.Misc) -> ttk.Style:
     style.configure("Muted.TLabel", background=BG, foreground=MUTED, font=FONT_SMALL)
     style.configure("CardMuted.TLabel", background=CARD, foreground=MUTED, font=FONT_SMALL)
     style.configure("Value.TLabel", background=CARD, foreground=INK, font=FONT_VALUE)
+    style.configure(
+        "SecondaryValue.TLabel", background=CARD, foreground=INK, font=FONT
+    )
 
     style.configure(
         "TButton",
@@ -156,8 +159,24 @@ def install(root: tk.Misc) -> ttk.Style:
         darkcolor=[("focus", ACCENT)],
     )
 
-    style.configure("TCheckbutton", background=CARD, foreground=INK, font=FONT)
-    style.map("TCheckbutton", background=[("active", CARD)])
+    style.configure(
+        "TCheckbutton",
+        background=CARD,
+        foreground=INK,
+        font=FONT,
+        indicatorsize=12,
+        indicatormargin=4,
+        indicatorbackground="#ffffff",
+        indicatorforeground="#8fa3c4",
+        upperbordercolor=BORDER,
+        lowerbordercolor=BORDER,
+    )
+    style.map(
+        "TCheckbutton",
+        background=[("active", CARD)],
+        indicatorbackground=[("selected", ACCENT), ("active", "#eef2f9")],
+        indicatorforeground=[("selected", "#ffffff"), ("active", INK)],
+    )
 
     style.configure(
         "TScrollbar",

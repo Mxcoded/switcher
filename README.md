@@ -1,16 +1,20 @@
-# BrickVPN Branch Selector
+# Switcher
 
-A small Windows desktop tool for Brickspoint Technologies hotel/POS sites. Staff
-open one app, choose the branch they are working at, and the tool points the
-hotel software's `settings.ini` at that branch's server. With Twingate already
-signed in, the hotel software can then reach the branch and the user can log in.
+**Switcher** is a Windows desktop utility owned by **Afriwave Technology** and
+developed by **Mxcoded**. It is deployed at Brickspoint Technologies hotel/POS
+sites: staff open the app, choose the branch they are working at, and the tool
+points the hotel software's `settings.ini` at that branch's server. With
+Twingate already signed in, the hotel software can then reach the branch and the
+user can log in.
 
 | | |
 | --- | --- |
 | **What it is** | A safe editor for one value: `server` in `[Connection_Info]`. |
 | **What it is not** | A VPN client. It does not start, configure, or log in to Twingate. |
 | **Platform** | Windows 10 / 11 (64-bit). |
+| **Licence** | Signed `license.json`; six-month term, checked offline. |
 | **Runtime** | Packaged `.exe` - no Python needed; requests administrator rights on launch. |
+| **Installer** | `SwitcherSetup.exe` installs into `C:\hotel`, creates shortcuts and keeps site data. |
 
 ---
 
@@ -19,26 +23,28 @@ signed in, the hotel software can then reach the branch and the user can log in.
 1. [Features](#features)
 2. [How it works](#how-it-works)
 3. [Requirements](#requirements)
-4. [Deployment](#deployment)
-5. [First run and the desktop shortcut](#first-run-and-the-desktop-shortcut)
-6. [Daily use](#daily-use)
-7. [Window guide](#window-guide)
+4. [Install](#install)
+5. [Using Switcher](#using-switcher)
+6. [Window guide](#window-guide)
+7. [Editing branches in the app](#editing-branches-in-the-app)
 8. [Branch catalogue reference](#branch-catalogue-reference)
 9. [How settings.ini is handled](#how-settingsini-is-handled)
 10. [Connection checks and Twingate](#connection-checks-and-twingate)
 11. [Troubleshooting](#troubleshooting)
 12. [Command-line options](#command-line-options)
 13. [Development](#development)
-14. [Security and privacy](#security-and-privacy)
-15. [FAQ](#faq)
-16. [Known limitations and roadmap](#known-limitations-and-roadmap)
+14. [Licence and renewal](#licence-and-renewal)
+15. [Security and privacy](#security-and-privacy)
+16. [FAQ](#faq)
+17. [Known limitations and roadmap](#known-limitations-and-roadmap)
 
 ---
 
 ## Features
 
-- **Branch list lives in `branches.json`** - add, rename, disable or re-address
-  branches without touching code or rebuilding the app.
+- **Edit branches in the app** - add, rename, disable, reorder or re-address
+  branches in a friendly dialog (**File > Edit branches**, `Ctrl+E`). No JSON
+  editing required; the list is still stored in `branches.json` for IT.
 - **Conservative `settings.ini` editing** - only the `server` value in
   `[Connection_Info]` changes. Comments, key casing, line endings and all other
   sections are preserved.
@@ -53,14 +59,26 @@ signed in, the hotel software can then reach the branch and the user can log in.
   while waiting, and a configurable timeout.
 - **Twingate awareness** - shows whether the Twingate client/service is running
   and gives guidance when it is not (sign-in state cannot be read locally).
-- **Portable deployment** - copy one exe and one JSON file next to the hotel
-  software; the app finds its files relative to itself, not the Desktop.
+- **One-folder deployment** - the app lives beside the hotel software in
+  `C:\hotel` and finds its files relative to itself, not the Desktop.
 - **Automatic desktop shortcut** - the packaged app creates/repairs its own
-  shortcut on first run, with the correct working directory.
+  shortcut on first run, with the correct working directory; the installer also
+  creates all-users Desktop and Start menu shortcuts.
 - **Support-friendly** - rotating log file, and **Help > Copy diagnostics**
   puts a complete status snapshot on the clipboard.
-- **Native, comfortable UI** - Windows theme, DPI awareness, keyboard
-  shortcuts, percentage progress and readable error messages.
+- **Bright, uncluttered window** - coloured status cards, clear typography,
+  striped branch table and prominent **Switch branch** button, with a matching
+  branch editor dialog.
+- **Offline licence with renewal reminders** - a signed six-month licence file,
+  30/14/7-day warnings and a 14-day grace period, so a hotel is never stranded
+  mid-shift; switching stops only after the grace period ends.
+- **Licence countdown in the window** - the status card always shows how many
+  days remain (or the remaining grace), turns amber near expiry and red when
+  switching stops.
+- **Branded installer** - `SwitcherSetup.exe` installs into `C:\hotel`, creates
+  Desktop and Start menu shortcuts for every user, registers an uninstaller and
+  never writes `settings.ini`. Existing branches and licences are kept unless
+  the operator explicitly replaces them.
 - **Runs elevated by default** - the packaged exe requests administrator rights
   through UAC, so protected hotel folders such as `C:\hotel` work without extra
   steps. Source runs can use **File > Restart as administrator**.
@@ -70,18 +88,21 @@ signed in, the hotel software can then reach the branch and the user can log in.
 ## How it works
 
 1. Twingate is running and the user is signed in.
-2. The user opens **BrickVPN Branch Selector** and picks a branch.
+2. The user opens **Switcher** and picks a branch.
 3. The app rewrites the `server` value in `settings.ini`.
 4. The app probes the branch server and shows reachable / unreachable.
 5. The user restarts the hotel software so it reads the new server, then logs in.
 
 ```
-Hotel software folder
+Hotel software folder (C:\hotel)
 ├── settings.ini                       <- read and updated by this app
 ├── branches.json                      <- branch list, maintained by IT
-├── BrickVPN Branch Selector.exe       <- this app
+├── license.json                       <- signed site licence (six-month term)
+├── Switcher.exe                       <- this app
+├── SwitcherSetup.exe                  <- installer / uninstaller copy
 ├── backups\                           <- automatic copies of settings.ini
 │   └── settings-20261115-120312.ini
+├── installer-backups\                 <- files replaced by an upgrade
 └── ... hotel software files
 ```
 
@@ -104,8 +125,8 @@ Per-user data is kept outside the app folder so the deployment can be read-only:
 
 | Item | Location |
 | --- | --- |
-| Last branch / last switch / custom paths | `%LOCALAPPDATA%\BrickVPN\state.json` |
-| Log file | `%LOCALAPPDATA%\BrickVPN\logs\switcher.log` |
+| Last branch / last switch / custom paths | `%LOCALAPPDATA%\Afriwave\Switcher\state.json` |
+| Log file | `%LOCALAPPDATA%\Afriwave\Switcher\logs\switcher.log` |
 | Backups of the real `settings.ini` | `<folder of settings.ini>\backups\` |
 
 ---
@@ -113,108 +134,164 @@ Per-user data is kept outside the app folder so the deployment can be read-only:
 ## Requirements
 
 - Windows 10 or Windows 11, 64-bit.
-- The hotel software installed with its `settings.ini`.
+- The hotel software installed with its `settings.ini` (normally `C:\hotel`).
 - Twingate installed, running and signed in on the workstation.
 - The Twingate user must have access to the branch resources; a running client
   with no access will still fail the connection check.
-- Write permission to the folder containing `settings.ini`, or run the app as
-  administrator for protected folders such as `C:\hotel`.
+- Administrator rights on the workstation. The installer and the app both ask
+  for them, because `C:\hotel` is usually protected.
 - For source runs or rebuilds only: Python 3.10+ with tkinter (the bundled
   `.venv` uses Python 3.12).
 
 ---
 
-## Deployment
+## Install
 
-### New workstation
+The installer is a single file, `SwitcherSetup.exe`, produced by the vendor. It
+contains the application, the branch catalogue and the current site licence, so
+there is nothing else to copy. It always installs into `C:\hotel` and never
+touches the hotel software's `settings.ini`.
+
+### Install on a workstation
+
+1. Install Twingate and sign in, so the connection test at the end can succeed.
+2. Copy `SwitcherSetup.exe` to the workstation (USB stick, network share or
+   software deployment tool) and double-click it.
+3. If Windows SmartScreen appears, select **More info > Run anyway**. The build
+   is not code-signed yet.
+4. Approve the **User Account Control** prompt. Windows asks because the
+   installer writes to `C:\hotel` and to the machine-wide uninstall entry.
+5. Check the setup window:
+   - **Install folder** - fixed at `C:\hotel`. The note tells you whether
+     Switcher is already installed and whether `settings.ini` was found.
+   - **Site licence** - the customer and expiry date read from the bundled
+     `license.json`.
+   - **Options** - described in the table below. The defaults are safe for an
+     existing site.
+6. Select **Install** and wait for the progress bar to finish.
+7. Read the summary, then select **OK**. If **Open Switcher when the
+   installation finishes** was left ticked, the app starts immediately;
+   otherwise use the new **Switcher** shortcut.
+8. Confirm `C:\hotel` now contains `Switcher.exe`, `SwitcherSetup.exe`,
+   `branches.json` and `license.json`, with the hotel software's files unchanged.
+9. Continue with [Using Switcher](#using-switcher).
+
+The installer creates **Switcher** shortcuts on the public Desktop and in the
+Start menu, so every Windows user on the workstation gets them. Per-user state
+and logs still live in `%LOCALAPPDATA%\Afriwave\Switcher`.
+
+### Installer options
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| Replace the existing `branches.json` | off | Copies the catalogue carried by the installer over the site's file. Only use when the vendor supplied a new catalogue; the old file is backed up first. |
+| Replace the existing `license.json` | off | Installs the licence carried by the installer, for example a renewal delivered as a new setup file. The old file is backed up first. |
+| Create Desktop and Start menu shortcuts for all users | on | Writes the two shortcuts and points them at `C:\hotel\Switcher.exe`. |
+| Open Switcher when the installation finishes | on | Starts the app once the installer closes. |
+
+The two replace options are greyed out when the file does not exist yet, so a
+fresh workstation always receives the bundled catalogue and licence. Any file
+that is replaced is copied to `C:\hotel\installer-backups\` with a timestamp.
+
+### Unattended install
+
+For Intune, a login script or a remote session:
+
+```powershell
+"SwitcherSetup.exe" --silent
+```
+
+`--silent` uses the defaults above: keep site data, create shortcuts, do not
+open the app. Run it from an elevated context, because Windows cannot show a UAC
+prompt to an unattended session. The process exits with `0` on success and `1`
+on failure; details go to
+`%LOCALAPPDATA%\Afriwave\Switcher\logs\installer.log`.
+
+### Upgrade an existing site
+
+1. Close Switcher.
+2. Run the new `SwitcherSetup.exe` and approve UAC. It replaces `Switcher.exe`
+   and the uninstaller copy, keeps the site's `branches.json`, `license.json`
+   and `settings.ini`, and refreshes the shortcuts and uninstall entry.
+3. Start the app. State and logs in `%LOCALAPPDATA%\Afriwave\Switcher` survive
+   the upgrade.
+
+The old executable is copied to `C:\hotel\installer-backups\` before it is
+replaced.
+
+### Uninstall
+
+Use **Settings > Apps > Installed apps > Switcher > Uninstall**, or run:
+
+```powershell
+"C:\hotel\SwitcherSetup.exe" --uninstall
+```
+
+The uninstaller removes `Switcher.exe`, `SwitcherSetup.exe`, both shortcuts and
+the Add/Remove Programs entry. It deliberately keeps `settings.ini`,
+`branches.json`, `license.json`, `backups\` and `installer-backups\`, so the
+hotel software keeps working and a reinstall keeps its configuration.
+
+> The executables are not code-signed. SmartScreen may warn the first time they
+> run on a new machine; use **More info > Run anyway**, or code-sign the build
+> before a wider rollout.
+
+### Manual copy (alternative)
+
+If the installer cannot be used, the app still runs as plain files:
 
 1. Install and sign in to Twingate.
-2. Locate the folder that contains the hotel software's `settings.ini`.
-3. Copy these two files into that folder:
-   - `BrickVPN Branch Selector.exe`
-   - `branches.json`
-4. Run the exe once. A **BrickVPN Branch Selector** shortcut is placed on the
-   current user's Desktop.
-5. Test a switch, restart the hotel software, and confirm login.
-
-> Approve the **User Account Control** prompt when the app starts: the packaged
-> exe requests administrator rights so it can update `settings.ini` inside
-> protected folders such as `C:\hotel`. The desktop shortcut launches the same
-> elevated exe. When running from source, use **File > Restart as
-> administrator** if Windows reports denied access.
-
-No installer, Windows service or registry changes are required. Each Windows
-user who runs the app gets their own state and their own shortcut.
-
-### Upgrading an existing site
-
-1. Close the app.
-2. Replace `BrickVPN Branch Selector.exe` with the new build.
-3. Keep the site's `branches.json` and `settings.ini` - do not overwrite them
-   with the repository defaults.
-4. Start the app; the shortcut is repaired automatically if the exe moved.
-
-State and logs in `%LOCALAPPDATA%\BrickVPN` are preserved across upgrades.
-
-### Uninstalling
-
-1. Delete the Desktop shortcut.
-2. Delete the exe and `branches.json` from the hotel software folder.
-3. Optionally delete `%LOCALAPPDATA%\BrickVPN` and the `backups\` folder if the
-   history is no longer needed.
-
-`settings.ini` is left as it is; the hotel software keeps using the last
-selected branch.
-
-> The executable is not code-signed. Windows SmartScreen may warn the first
-> time it runs on a new machine; use **More info > Run anyway**, or code-sign
-> the build before a wider rollout.
+2. Copy `Switcher.exe`, `branches.json` and `license.json` into `C:\hotel`
+   (the folder that contains the hotel software's `settings.ini`).
+3. Run `Switcher.exe` once and approve UAC. A **Switcher** shortcut is placed on
+   the current user's Desktop.
+4. Test a switch, restart the hotel software, and confirm login.
 
 ---
 
-## First run and the desktop shortcut
+## Using Switcher
 
-When the **packaged** app starts and no valid shortcut is recorded, it creates:
+### Start the app
 
-- **Name:** `BrickVPN Branch Selector.lnk`
-- **Target:** the exe that is running
-- **Working directory:** the exe's folder (so `settings.ini` is found)
-- **Icon:** the exe icon, or `assets\brickvpn.ico` if one was built in
+Open **Switcher** from the Desktop or Start menu and approve the UAC prompt. The
+window lists the configured branches and shows the current hotel server,
+Twingate, the last connection check and the licence countdown.
 
-The app tracks the shortcut target in its state. If the deployment folder moves,
-the stale shortcut is recreated with the new path on the next launch.
+### First launch: settings.ini and the shortcut
 
-If the shortcut is missing or was deleted, use **File > Create desktop shortcut**.
-Running from source does not auto-create a shortcut; use the same menu item or
-set `BRICKVPN_FORCE_SHORTCUT=1`.
+On a normal installation the app reads `C:\hotel\settings.ini`, so no setup is
+needed. It looks for the file in this order:
 
-If the app starts without finding `settings.ini` next to itself, it asks once
-whether to locate the hotel software's file; the chosen path is remembered in
-`state.json`. Running the app from `dist\` without a `settings.ini` is otherwise
-a valid way to look at the branch list.
+1. `C:\hotel\settings.ini` - the deployment folder used by every site;
+2. the folder next to `Switcher.exe`;
+3. the path chosen last time with **File > Locate settings.ini...**;
+4. the current working directory.
 
-> `settings.ini` next to the app always takes priority over a previously located
-> file, so moving the whole folder never edits a stale copy. Use
-> `File > Locate settings.ini...` or `--settings <path>` to override.
+If none exists, it asks once whether to locate the hotel software's file; the
+chosen path is remembered in `state.json`. Use **File > Locate settings.ini...**
+or `--settings <path>` to point at a different folder.
 
----
+When the **packaged** app starts and no valid shortcut is recorded, it creates a
+`Switcher.lnk` on the current user's Desktop, targeting the running exe with the
+exe's folder as the working directory. If the shortcut is missing or points at
+an old folder, use **File > Create desktop shortcut**. Source runs never create
+one automatically unless `SWITCHER_FORCE_SHORTCUT=1` is set.
 
-## Daily use
+### Switch to a branch
 
-1. Open **Twingate** and make sure it is signed in.
-2. Open **BrickVPN Branch Selector** from the Desktop and approve the UAC
-   prompt.
-3. Check the status card:
-   - **Current server** shows what the hotel software is using now.
-   - **Twingate** should say *Detected*.
-4. Select the branch. The row marked **Current** is the active one.
-5. Press **Switch Branch**. The app writes the new server and checks it. The
-   status bar shows what it is doing and how far along it is (for example
-   `Waiting for 192.168.2.16:1433 - 1.2s of 2.0s (68%)`).
-6. Read the result dialog, then **restart the hotel software**.
-7. Log in with the account for that branch.
+1. Make sure Twingate is running and signed in.
+2. Check the status card: **Twingate** should say *Detected* and **Licence**
+   should show time remaining.
+3. Select the branch you are working at. The row marked **Current** is the
+   branch already in `settings.ini`.
+4. Select **Switch branch** (or double-click the row, or press `Enter`). The app
+   writes the server address and probes the branch, with a progress bar and
+   per-port countdown in the status bar.
+5. Read the result dialog, then **restart the hotel software** so it reads the
+   new `settings.ini`.
+6. Log in with the account for that branch.
 
-A switch dialog looks like this:
+A successful switch looks like this:
 
 ```
 Branch switched
@@ -227,8 +304,29 @@ Previous server: 192.168.0.5
 Reachable at 192.168.2.16:445 (12 ms)
 ```
 
-If the server cannot be reached, the dialog is a warning instead, and the
-reason is also shown in the **Connection** row.
+If the probe cannot reach the branch, the dialog is a warning instead and the
+reason also appears in the **Connection** row. The server address has still been
+written; treat it as a Twingate or network problem. Selecting the branch that is
+already active reports *already set* without rewriting the file, and still runs
+the check.
+
+### Everyday actions
+
+| Action | How |
+| --- | --- |
+| Add, rename, disable or re-address branches | **File > Edit branches...** (`Ctrl+E`) |
+| Re-check the selected branch | **Test connection** (`Ctrl+T`) |
+| Re-read `settings.ini` and Twingate | **Refresh status** (`F5`) |
+| Reload an externally edited `branches.json` | **Reload** (`Ctrl+R`) |
+| Send a support snapshot | **Help > Copy diagnostics** (`Ctrl+D`) |
+| See the licence and renewal countdown | **Help > Licence** (`Ctrl+L`), or click the **Licence** row |
+| Work in another hotel folder | **File > Locate settings.ini...** |
+| Fix a missing or stale shortcut | **File > Create desktop shortcut** |
+| Retry after an access-denied error | **File > Restart as administrator** |
+| Find the log | **File > Open log folder** |
+
+The full window reference, including every column and menu item, is in the
+[Window guide](#window-guide).
 
 ---
 
@@ -241,7 +339,8 @@ reason is also shown in the **Connection** row.
 | Current server | Value currently in `settings.ini`, plus the branch it matches. Red if the file is missing or unreadable. |
 | Twingate | *Detected (client process running / background service running)* or *Not detected*. This is a liveness check only - sign-in state cannot be read locally. |
 | Connection | Result of the last TCP probe: port and latency, or a troubleshooting hint. |
-| Settings file | Full path of the file being edited, with **Open** and **Change...** buttons. |
+| Licence | Days left on the site licence, remaining grace after expiry, or a renewal warning. Amber near expiry, red when switching is blocked. Click the value for **Help > Licence**. |
+| Settings file | Shortened path of the file being edited, with **Open** and **Change...** buttons. |
 
 While a switch or connection test runs, a progress bar and percentage appear on
 the right of the status bar, the busy cursor is shown, and the action buttons
@@ -254,14 +353,16 @@ moves during the network check.
 - `Server` - address that will be written to `settings.ini`.
 - `Status` - **Current** for the branch that matches `settings.ini`.
 - Double-click a row, or select it and press **Enter**, to switch.
+- **Reload** re-reads `branches.json`; **Edit branches** opens the in-app editor.
 
 **Buttons**
 
 | Button | Action |
 | --- | --- |
-| Test Connection | Probe the selected branch (or the current server if none is selected). |
-| Refresh | Re-read `settings.ini` and re-check Twingate. |
-| Switch Branch | Write the selected branch and probe it. |
+| Test connection | Probe the selected branch (or the current server if none is selected). |
+| Refresh status | Re-read `settings.ini` and re-check Twingate. |
+| Edit branches... | Open the branch editor (same as `File > Edit branches`). |
+| Switch branch | Write the selected branch and probe it. |
 
 **Menus and keyboard shortcuts**
 
@@ -270,22 +371,58 @@ moves during the network check.
 | `Enter` (in the table) | Switch to the selected branch |
 | `F5` | Refresh status |
 | `Ctrl+T` | Test connection |
+| `Ctrl+E` | Edit branches |
 | `Ctrl+R` | Reload `branches.json` |
 | `Ctrl+D` | Copy diagnostics to the clipboard |
+| `Ctrl+L` | Show the site licence and renewal countdown |
 | `File > Locate settings.ini...` | Point the app at a different hotel installation |
-| `File > Edit branches.json` | Open the catalogue in the default editor |
+| `File > Edit branches...` | Open the friendly branch editor |
+| `File > Open branches.json (advanced)` | Open the raw JSON in the default editor |
 | `File > Create desktop shortcut` | Create or repair the shortcut |
 | `File > Restart as administrator` | Relaunch elevated (shown only when not already elevated) |
-| `File > Open log folder` | Open `%LOCALAPPDATA%\BrickVPN\logs` |
+| `File > Open log folder` | Open `%LOCALAPPDATA%\Afriwave\Switcher\logs` |
 | `Help > About` | Version and active paths |
 
-`branches.json` is also watched: after you edit and save it, returning focus to
-the window reloads the table automatically. Invalid content produces an inline
-error and a dialog, and the previous table stays usable.
+`branches.json` is also watched: after you edit and save it (in the app or
+externally), returning focus to the window reloads the table automatically.
+Invalid content produces an inline error and a dialog, and the previous table
+stays usable.
+
+---
+
+## Editing branches in the app
+
+Open **File > Edit branches...**, `Ctrl+E`, or the **Edit branches** button.
+The dialog changes only `branches.json`; `settings.ini` is never touched until
+you switch branches.
+
+- **Left list** - every configured branch, including disabled ones (shown
+  greyed out). Select a row to edit it.
+- **Add** creates a new row; **Duplicate** copies the selected branch (useful
+  when two sites share a server); **Remove** deletes a row; **Move up** /
+  **Move down** set the order shown in the main window.
+- **Branch details** - the name shown in the list, the server address, and the
+  optional display label, connection alias, check host and check ports.
+- **Offer this branch in the selector** - untick to hide a branch without
+  deleting it. Disabled rows are preserved on save.
+- **Connection defaults** - ports checked when a branch has no ports of its
+  own, and the probe timeout (0.5 to 30 seconds).
+
+**Save branches** validates every row first (name, IP address or host name,
+ports, timeout) and writes the file atomically. If anything is wrong the dialog
+stays open and points at the offending branch. **Cancel** asks before discarding
+unsaved changes.
+
+Only two things cannot be edited here: internal branch `id` values (generated
+automatically and kept stable) and the raw JSON layout. Use
+**File > Open branches.json (advanced)** if IT needs to change those.
 
 ---
 
 ## Branch catalogue reference
+
+The normal way to change branches is **File > Edit branches...**. This section
+documents the underlying file for IT and for advanced edits.
 
 `branches.json` is read every time the app starts and whenever the window
 regains focus after the file changed. It is strict JSON: double quotes, no
@@ -427,7 +564,7 @@ to take its time; the app does not freeze because it runs on a worker thread.
 | --- | --- | --- |
 | Detected | Reachable | Normal state; restart the hotel software and log in. |
 | Detected | Unreachable | Client is running but not usable: finish sign-in, check the user's resource access, or the branch server is offline. |
-| Not detected | Unreachable | Start Twingate, sign in, then press **Refresh** and test again. |
+| Not detected | Unreachable | Start Twingate, sign in, then press **Refresh status** and test again. |
 | Not detected | Reachable | The network path is probably still up; confirm Twingate status before relying on it. |
 
 Twingate detection looks for a `twingate*` process and the `Twingate` /
@@ -445,7 +582,7 @@ has already succeeded either way.
 
 | Symptom | Likely cause | Action |
 | --- | --- | --- |
-| "Twingate: Not detected" | Client not running, or detection blocked | Open Twingate and sign in; press **Refresh**; check Task Manager for a Twingate process. |
+| "Twingate: Not detected" | Client not running, or detection blocked | Open Twingate and sign in; press **Refresh status**; check Task Manager for a Twingate process. |
 | "No response from ... on port 445, 1433" | Not signed in, no resource access, server offline, or wrong ports | Sign in to Twingate, verify the branch server is up, set `check_ports`, or test from another workstation. |
 | Dialog says branch was set but connection was not verified | The write succeeded; only the probe failed | Treat as a network/Twingate issue; the hotel software may still work. |
 | "Could not write settings.ini" | File locked by the hotel software or the folder is administrator-protected | Close the hotel software; if the message mentions access, accept the offer to restart as administrator (or right-click the app > **Run as administrator**). |
@@ -454,14 +591,19 @@ has already succeeded either way.
 | No branches appear after editing | JSON saved in another folder or malformed | Confirm the path shown under **Settings file** uses the app folder's `branches.json`. |
 | Shortcut missing or points to an old folder | Moved exe, or shortcut deleted | **File > Create desktop shortcut**; the target is rewritten. |
 | Switched, but hotel software still uses the old server | It read `settings.ini` at start-up | Restart the hotel software. |
-| App window does not open | Corrupt deployment or missing files | Check `%LOCALAPPDATA%\BrickVPN\logs\switcher.log`; re-copy the exe. |
+| App window does not open | Corrupt deployment or missing files | Check `%LOCALAPPDATA%\Afriwave\Switcher\logs\switcher.log`; re-copy the exe. |
+| "No licence file was found" | `license.json` is missing or in the wrong folder | Copy the site licence next to `Switcher.exe`, or run with `--license PATH`, then restart. |
+| Red licence bar / switching disabled | The term ended and the 14-day grace period passed | Issue a renewal and replace `license.json`; no reinstall needed. |
+| "signature does not match" | The file was edited, truncated or belongs to another customer/key | Replace it with the signed file Afriwave sent. |
+| Clock warning on the licence bar | The Windows date moved backwards | Correct the date and time, then restart the app. |
 | SmartScreen warning on first run | Unsigned executable | **More info > Run anyway**, or sign the build. |
 
 ### Collecting diagnostics
 
 1. In the app, press `Ctrl+D` (**Help > Copy diagnostics**). The clipboard now
    contains the version, Windows build, active paths, current server, Twingate
-   and connection status, and any branch-list error.
+   and connection status, the licence countdown and state, and any branch-list
+   error.
 2. Open **File > Open log folder** and attach `switcher.log` if the problem is
    reproducible.
 3. Include the selected branch and the exact dialog text in the report.
@@ -471,28 +613,36 @@ has already succeeded either way.
 ## Command-line options
 
 ```powershell
-"BrickVPN Branch Selector.exe" [--settings PATH] [--branches PATH] [--no-shortcut]
+"Switcher.exe" [--settings PATH] [--branches PATH] [--license PATH] [--no-shortcut]
 ```
 
 | Option | Description |
 | --- | --- |
-| `--settings PATH` | Use a specific `settings.ini` instead of the one next to the app. |
+| `--settings PATH` | Use a specific `settings.ini` instead of `C:\hotel\settings.ini` or the one next to the app. |
 | `--branches PATH` | Use a specific `branches.json`. |
+| `--license PATH` | Use a specific `license.json` instead of the search next to the app, `%PROGRAMDATA%` and `%LOCALAPPDATA%`. |
 | `--no-shortcut` | Do not create the desktop shortcut automatically this run. |
 | `--version` | Print the version and exit (source runs). |
 
-Environment variables:
+The installer (`SwitcherSetup.exe`) accepts:
+
+| Option | Description |
+| --- | --- |
+| `--silent` | Install with the default options; no window. |
+| `--uninstall` | Remove the program, shortcuts and uninstall entry; site data is kept. |
+
+Environment variables (the old `BRICKVPN_*` names are still accepted):
 
 | Variable | Effect |
 | --- | --- |
-| `BRICKVPN_NO_SHORTCUT=1` | Disable automatic shortcut creation for this user/session. |
-| `BRICKVPN_FORCE_SHORTCUT=1` | Allow automatic shortcut creation when running from source. |
+| `SWITCHER_NO_SHORTCUT=1` | Disable automatic shortcut creation for this user/session. |
+| `SWITCHER_FORCE_SHORTCUT=1` | Allow automatic shortcut creation when running from source. |
 
 Examples:
 
 ```powershell
-"BrickVPN Branch Selector.exe" --settings "D:\Hotel\settings.ini"
-"BrickVPN Branch Selector.exe" --no-shortcut
+"Switcher.exe" --settings "D:\Hotel\settings.ini"
+"Switcher.exe" --no-shortcut
 ```
 
 ---
@@ -502,20 +652,37 @@ Examples:
 ### Project structure
 
 ```
-BrickVPN/
+Switcher/
 ├── switcher.py              # entry point: args, logging, DPI, Tk start
+├── switcher_setup.py        # entry point of the installer
 ├── brickvpn/
 │   ├── __init__.py          # version
-│   ├── ui.py                # window, worker threads, dialogs
+│   ├── branding.py          # product name, owner and developer
+│   ├── ui.py                # main window, worker threads, dialogs
+│   ├── branch_editor.py     # in-app branches.json editor dialog
+│   ├── theme.py             # colours, fonts and ttk styles
+│   ├── licensing.py         # signed licence verification, expiry and countdown
 │   ├── settings_file.py     # conservative settings.ini editor
 │   ├── branches.py          # branches.json model and validation
 │   ├── netcheck.py          # TCP probe, Twingate detection
-│   ├── shortcut.py          # desktop shortcut via PowerShell/WScript
-│   └── paths.py             # app/state paths, settings resolution
+│   ├── shortcut.py          # shortcuts via PowerShell/WScript
+│   └── paths.py             # C:\hotel, app/state paths, settings resolution
+├── installer/
+│   ├── core.py              # install plan, backups, registry, uninstall
+│   └── setup.py             # setup window (SwitcherSetup.exe)
+├── assets/
+│   ├── brand_board.png      # Afriwave artwork the icon is generated from
+│   ├── switcher.ico         # multi-size icon (generated)
+│   └── logo_mark.png        # transparent header mark (generated)
 ├── tests/                   # unittest suite
+├── tools/                   # vendor-only key, licence and asset tools
 ├── branches.json            # sample/default branch catalogue
+├── license.json             # signed site licence (six-month term)
 ├── settings.ini             # target file for this deployment
-├── BrickVPN.spec            # PyInstaller build definition
+├── Switcher.spec            # PyInstaller build for Switcher.exe
+├── SwitcherSetup.spec       # PyInstaller build for SwitcherSetup.exe
+├── version_info.txt         # Windows metadata for Switcher.exe
+├── version_info_setup.txt   # Windows metadata for SwitcherSetup.exe
 ├── requirements.txt         # build-time dependency (PyInstaller)
 ├── README.md
 └── AGENTS.md                # notes for coding agents
@@ -535,38 +702,57 @@ library, tkinter, and built-in Windows tools (`powershell.exe`, `tasklist`,
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -t . -v
-.\.venv\Scripts\python.exe -m compileall -q brickvpn switcher.py tests
+.\.venv\Scripts\python.exe -m compileall -q brickvpn installer switcher.py switcher_setup.py tools tests
 ```
 
 The tests cover the settings editor (comments, BOM, CRLF, cp1252, backups,
-atomic replacement), branch validation, path precedence, TCP probing and
-shortcut script generation. They never touch the real `settings.ini` and never
-create a desktop shortcut.
+atomic replacement), branch validation and document round-trips, the in-app
+editor, path precedence (`C:\hotel` first), TCP probing, signed-licence
+verification, the expiry and grace policy, the renewal countdown, clock-rollback
+handling, shortcut script generation and the installer's copy plan (site data is
+never overwritten by default). They never touch the real `settings.ini`, the real
+`C:\hotel` or the registry, and never create a shortcut.
 
 ### Build the executable
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\pyinstaller.exe --noconfirm BrickVPN.spec
+.\.venv\Scripts\python.exe tools\make_assets.py      # rebuild icon and header mark
+.\.venv\Scripts\pyinstaller.exe --noconfirm Switcher.spec
+.\.venv\Scripts\pyinstaller.exe --noconfirm SwitcherSetup.spec
 ```
 
-Output: `dist\BrickVPN Branch Selector.exe` (one file, no console window,
-~12 MB). Delete `build\` safely at any time; it is regenerated.
+Outputs:
 
-`branches.json` and `settings.ini` are deliberately **not** bundled. They are
-data owned by the site and must sit next to the exe at runtime.
+- `dist\Switcher.exe` - one file, no console window, ~12 MB, requires
+  administrator rights, icon and header mark embedded.
+- `dist\SwitcherSetup.exe` - the installer, ~24 MB (it carries `Switcher.exe`,
+  `branches.json` and `license.json`), requires administrator rights.
 
-Optional icon: place `assets\brickvpn.ico` before building. It is used for the
-executable, the shortcut and the window icon.
+Delete `build\` safely at any time; it is regenerated.
+
+`branches.json`, `license.json` and `settings.ini` are deliberately **not**
+bundled into `Switcher.exe`. They are data owned by the site and must sit next
+to the exe at runtime. The installer carries its own copies so a fresh machine
+is complete after one run.
+
+The icon and header mark come from `assets\brand_board.png`; do not edit
+`switcher.ico` or `logo_mark.png` by hand. Replace the artwork and re-run
+`tools\make_assets.py` (Pillow is a build-time tool only).
 
 ### Releasing
 
-1. Update `__version__` in `brickvpn/__init__.py`.
+1. Update `__version__` in `brickvpn/__init__.py`, `version_info.txt` and
+   `version_info_setup.txt`.
 2. Run the test suite.
-3. Rebuild with the command above.
-4. Smoke-test on a clean workstation: launch, switch branch, restart hotel
-   software, log in, check `backups\` and the log.
-5. Distribute the exe plus the site's `branches.json`.
+3. Rebuild `Switcher.spec` and then `SwitcherSetup.spec`. The setup build
+   packages the `dist\Switcher.exe` produced by the first build, so always build
+   the app first and refresh `dist\branches.json` / `dist\license.json`.
+4. Smoke-test the installer on a clean workstation: install, switch branch,
+   restart the hotel software, log in, check `installer-backups\`, then
+   uninstall and reinstall.
+5. Distribute `SwitcherSetup.exe` (or `Switcher.exe` plus the site files for a
+   manual deployment).
 
 ### Conventions
 
@@ -581,9 +767,71 @@ executable, the shortcut and the window icon.
 
 ---
 
+## Licence and renewal
+
+Switcher is licensed for a fixed term (six months by default). The check is
+offline: no activation server, no network call, and nothing that can fail
+because Twingate is down.
+
+### Files
+
+`license.json` sits next to `Switcher.exe`. The app also looks in
+`%PROGRAMDATA%\Afriwave\Switcher` and `%LOCALAPPDATA%\Afriwave\Switcher`, so IT
+can install one licence centrally if preferred. The file is signed with the
+vendor's RSA-2048 key; the app carries only the public half. A site can read the
+customer, dates and seat count but cannot edit them or move the expiry date.
+
+### Timeline for a six-month licence
+
+| When | What staff see | Switching |
+| --- | --- | --- |
+| More than 30 days left | nothing | allowed |
+| 30 to 15 days left | blue reminder bar | allowed |
+| 14 days or fewer | amber reminder bar | allowed |
+| Expiry day | "expires today" warning | allowed |
+| The 14 days after expiry | amber grace bar | allowed |
+| After grace | red bar | disabled; viewing and connection tests still work |
+
+**Help > Licence** (`Ctrl+L`) shows the customer, licence ID, issue and expiry
+dates, seat count, the renewal countdown and the file in use. The status card's
+**Licence** row shows the countdown at all times: green while there is plenty of
+time, amber close to expiry or during grace, and red once switching is blocked.
+**Help > Copy diagnostics** includes the same summary, so a renewal support call
+can be handled from one clipboard paste.
+
+If the Windows clock is moved backwards, the app checks the licence against the
+most recent launch date and shows a warning instead of granting extra time.
+
+### Issuing a renewal
+
+The signing key is **not** in this repository. Keep `keys\private_key.json`
+offline and backed up; if it is lost, every licence has to be re-issued with a
+new key.
+
+```powershell
+# One-off, only when rotating the signing key:
+python tools\generate_keys.py --out keys\private_key.json
+
+# Issue or renew a licence:
+python tools\issue_license.py --key keys\private_key.json `
+    --id AFR-2026-002 --customer "Brickspoint Technologies" `
+    --site "All sites" --months 6 --seats 50 --out license.json
+```
+
+Copy the new `license.json` over the old one and restart the app. No reinstall
+and no exe rebuild is needed.
+
+> Client-side licensing is deterrence, not DRM: a determined attacker can patch
+> the executable. Pair it with an Authenticode-signed build and a contract that
+> names the customer and the renewal terms.
+
+---
+
 ## Security and privacy
 
 - The app stores **no credentials**. Twingate handles authentication.
+- The licence check is offline: the signed file is verified locally and nothing
+  is sent anywhere.
 - No telemetry, analytics or network calls beyond the configured TCP probes.
 - `branches.json` contains internal IP addresses and server names. Treat it as
   internal documentation and do not publish it outside the organisation.
@@ -607,7 +855,9 @@ No. Twingate must already be running and signed in. The app only edits the
 server address and checks reachability.
 
 **Can I add a branch without rebuilding?**
-Yes. Edit `branches.json` next to the exe; the app reloads it.
+Yes. Use **File > Edit branches...** in the app. The list is saved to
+`branches.json` next to the exe and reloaded immediately. IT can still edit the
+JSON directly if preferred.
 
 **Why must the hotel software be restarted?**
 It reads `settings.ini` at start-up. The app changes the file on disk; the
@@ -621,9 +871,30 @@ connection check so you can confirm it is healthy.
 The newest 10 files in `backups\`; older ones are removed automatically.
 
 **Can several sites share one installation?**
-Run one copy per hotel folder. Each exe finds the files next to itself; state
-(last branch/selection) is per Windows user, so it follows the user across
-folders.
+Each workstation has one deployment folder, normally `C:\hotel`. The app checks
+`C:\hotel\settings.ini` first, then the folder next to the exe, so a copy started
+from another folder still edits the live hotel configuration. State (last
+branch/selection) is per Windows user.
+
+**Does the licence check need internet?**
+No. `license.json` is signed and verified locally; there is no activation
+server.
+
+**What happens when the licence expires?**
+A reminder bar appears 30, 14 and 7 days before expiry. Switching stays
+available for 14 days after expiry, then stops until a new `license.json` is
+installed. Viewing the branch list and running connection tests never stop.
+
+**Does the installer overwrite `settings.ini` or my licence?**
+No. It never reads or writes `settings.ini`. An existing `branches.json` and
+`license.json` are kept unless the operator ticks the replace options, and any
+replaced file is copied to `C:\hotel\installer-backups` first.
+
+**Why does the app always look in `C:\hotel`?**
+That is where the hotel software keeps its live `settings.ini`. The app checks
+that folder first, then its own folder and a previously chosen file, so staff
+cannot accidentally edit a stale copy. Use **File > Locate settings.ini...** or
+`--settings` to override.
 
 **Does it work without Twingate?**
 The switch itself works (it is a file edit). Only the connection check depends
@@ -634,7 +905,7 @@ The probe uses generic TCP ports. The application may use a different port; set
 `check_ports` for that branch. The server address has already been written.
 
 **Where can I see what the app did?**
-`%LOCALAPPDATA%\BrickVPN\logs\switcher.log`, plus the `backups\` folder next to
+`%LOCALAPPDATA%\Afriwave\Switcher\logs\switcher.log`, plus the `backups\` folder next to
 `settings.ini`.
 
 ---
@@ -647,8 +918,11 @@ The probe uses generic TCP ports. The application may use a different port; set
   with an existing session).
 - Checks are TCP-level only, not a hotel-application login test.
 - Windows-only.
-- No auto-update; replace the exe during maintenance.
+- No auto-update; run the new `SwitcherSetup.exe` during maintenance, which
+  keeps site data and refreshes the shortcuts.
 - The exe is unsigned.
-- Possible future work: code signing, branded icon, installer/Intune package,
-  optional logging of every switch to a shared audit file, and a per-branch
-  application-level health check.
+- The licence is enforced client-side; a patched executable can bypass it. It is
+  deterrence backed by the support contract, not DRM.
+- Possible future work: code signing, Intune/MSI packaging, optional logging of
+  every switch to a shared audit file, and a per-branch application-level health
+  check.
